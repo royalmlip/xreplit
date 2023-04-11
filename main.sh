@@ -1,138 +1,76 @@
-#!/bin/sh
+#!/bin/bash
+# Create By xiaowansm
+# Modlfy By ifeng
+# Web Site:https://www.hicairo.com
+# Telegram:https://t.me/HiaiFeng
 
-# The URL of the script project is:
-# https://github.com/XTLS/Xray-install
+export PATH="~/nginx/sbin:~/mysql/sbin:$PATH"
 
-FILES_PATH=${FILES_PATH:-./}
+chmod a+x .nginx/sbin/nginx .mysql/sbin/mysql .mysql/sbin/qrencode
 
-# Gobal verbals
-
-# Xray current version
-CURRENT_VERSION=''
-
-# Xray latest release version
-RELEASE_LATEST=''
-
-get_current_version() {
-    # Get the CURRENT_VERSION
-    if [[ -f "${FILES_PATH}/web" ]]; then
-        CURRENT_VERSION="$(${FILES_PATH}/web -version | awk 'NR==1 {print $2}')"
-        CURRENT_VERSION="v${CURRENT_VERSION#v}"
-    else
-        CURRENT_VERSION=""
-    fi
-}
-
-get_latest_version() {
-    # Get latest release version number
-    RELEASE_LATEST="$(curl -IkLs -o ${TMP_DIRECTORY}/NUL -w %{url_effective} https://github.com/XTLS/Xray-core/releases/latest | grep -o "[^/]*$")"
-    RELEASE_LATEST="v${RELEASE_LATEST#v}"
-    if [[ -z "$RELEASE_LATEST" ]]; then
-        echo "error: Failed to get the latest release version, please check your network."
-        exit 1
-    fi
-}
-
-download_xray() {
-    DOWNLOAD_LINK="https://github.com/XTLS/Xray-core/releases/download/$RELEASE_LATEST/Xray-linux-64.zip"
-    if ! wget -qO "$ZIP_FILE" "$DOWNLOAD_LINK"; then
-        echo 'error: Download failed! Please check your network or try again.'
-        return 1
-    fi
-    return 0
-    if ! wget -qO "$ZIP_FILE.dgst" "$DOWNLOAD_LINK.dgst"; then
-        echo 'error: Download failed! Please check your network or try again.'
-        return 1
-    fi
-    if [[ "$(cat "$ZIP_FILE".dgst)" == 'Not Found' ]]; then
-        echo 'error: This version does not support verification. Please replace with another version.'
-        return 1
-    fi
-
-    # Verification of Xray archive
-    for LISTSUM in 'md5' 'sha1' 'sha256' 'sha512'; do
-        SUM="$(${LISTSUM}sum "$ZIP_FILE" | sed 's/ .*//')"
-        CHECKSUM="$(grep ${LISTSUM^^} "$ZIP_FILE".dgst | grep "$SUM" -o -a | uniq)"
-        if [[ "$SUM" != "$CHECKSUM" ]]; then
-            echo 'error: Check failed! Please check your network or try again.'
-            return 1
-        fi
-    done
-}
-
-decompression() {
-    busybox unzip -q "$1" -d "$TMP_DIRECTORY"
-    EXIT_CODE=$?
-    if [ ${EXIT_CODE} -ne 0 ]; then
-        "rm" -r "$TMP_DIRECTORY"
-        echo "removed: $TMP_DIRECTORY"
-        exit 1
-    fi
-}
-
-install_xray() {
-    install -m 755 ${TMP_DIRECTORY}/xray ${FILES_PATH}/web
-}
-
-run_xray() {
-    TR_PASSWORD=$(curl -s $REPLIT_DB_URL/tr_password)
-    TR_PATH=$(curl -s $REPLIT_DB_URL/tr_path)
-    if [ "${TR_PASSWORD}" = "" ]; then
-        NEW_PASS="$(echo $RANDOM | md5sum | head -c 8)"
-        curl -sXPOST $REPLIT_DB_URL/tr_password="${NEW_PASS}"
-    fi
-    if [ "${TR_PATH}" = "" ]; then
-        NEW_PATH=$(echo $RANDOM | md5sum | head -c 6)
-        curl -sXPOST $REPLIT_DB_URL/tr_path="${NEW_PATH}"
-    fi
-    if [ "${PASSWORD}" = "" ]; then
-        USER_PASSWORD=$(curl -s $REPLIT_DB_URL/tr_password)
-    else
-        USER_PASSWORD=${PASSWORD}
-    fi
-    if [ "${WSPATH}" = "" ]; then
-        USER_PATH=/$(curl -s $REPLIT_DB_URL/tr_path)
-    else
-        USER_PATH=${WSPATH}
-    fi
-    cp -f ./config.yaml /tmp/config.yaml
-    sed -i "s|PASSWORD|${USER_PASSWORD}|g;s|WSPATH|${USER_PATH}|g" /tmp/config.yaml
-    ./web -c /tmp/config.yaml 2>&1 >/dev/null &
-    PATH_IN_LINK=$(echo ${USER_PATH} | sed "s|\/|\%2F|g")
-    echo ""
-    echo "Share Link:"
-    echo trojan://"${USER_PASSWORD}@${REPL_SLUG}.${REPL_OWNER}.repl.co:443?security=tls&type=ws&path=${PATH_IN_LINK}#Replit"
-    echo "Trojan Password: ${USER_PASSWORD}, Websocket Path: ${USER_PATH}, Domain: ${REPL_SLUG}.${REPL_OWNER}.repl.co, Port: 443"
-    echo trojan://"${USER_PASSWORD}@${REPL_SLUG}.${REPL_OWNER}.repl.co:443?security=tls&type=ws&path=${PATH_IN_LINK}#Replit" >/tmp/link
-    echo ""
-    qrencode -t ansiutf8 </tmp/link
-    while :; do
-        curl https://${REPL_SLUG}.${REPL_OWNER}.repl.co
-        sleep 600
-    done
-}
-
-# Two very important variables
-TMP_DIRECTORY="$(mktemp -d)"
-ZIP_FILE="${TMP_DIRECTORY}/web.zip"
-
-get_current_version
-get_latest_version
-if [ "${RELEASE_LATEST}" = "${CURRENT_VERSION}" ]; then
-    "rm" -rf "$TMP_DIRECTORY"
-    run_xray
+if [ ! -d "~/nginx" ];then
+	\cp -ax .nginx ~/nginx
 fi
-download_xray
-EXIT_CODE=$?
-if [ ${EXIT_CODE} -eq 0 ]; then
-    :
-else
-    "rm" -r "$TMP_DIRECTORY"
-    echo "removed: $TMP_DIRECTORY"
-    run_xray
+if [ ! -d "~/mysql" ];then
+	\cp -ax .mysql ~/mysql
 fi
-decompression "$ZIP_FILE"
-install_xray
-"rm" -rf "$TMP_DIRECTORY"
 
-run_xray
+UUID=${UUID:-$REPL_ID}
+VMESS_WSPATH=${VMESS_WSPATH:-'/vm'}
+VLESS_WSPATH=${VLESS_WSPATH:-'/vl'}
+TROJAN_WSPATH=${TROJAN_WSPATH:-'/tr'}
+
+sed -i "s#[0-9a-f]\{8\}-[0-9a-f]\{4\}-[0-9a-f]\{4\}-[0-9a-f]\{4\}-[0-9a-f]\{12\}#$UUID#g;s#/10000#$VMESS_WSPATH#g;s#/20000#$VLESS_WSPATH#g;s#/30000#$TROJAN_WSPATH#g" ~/mysql/etc/config.json
+sed -i "s#/10000#$VMESS_WSPATH#g;s#/20000#$VLESS_WSPATH#g;s#/30000#$TROJAN_WSPATH#g" ~/nginx/conf/conf.d/default.conf
+
+URL=${REPL_SLUG}.${REPL_OWNER}.repl.co
+
+vmlink=$(echo -e '\x76\x6d\x65\x73\x73')://$(echo -n "{\"v\":\"2\",\"ps\":\"hicairo.com\",\"add\":\"$URL\",\"port\":\"443\",\"id\":\"$UUID\",\"aid\":\"0\",\"net\":\"ws\",\"type\":\"none\",\"host\":\"$URL\",\"path\":\"$VMESS_WSPATH\",\"tls\":\"tls\"}" | base64 -w 0)
+vllink=$(echo -e '\x76\x6c\x65\x73\x73')"://"$UUID"@"$URL":443?encryption=none&security=tls&type=ws&host="$URL"&path="$VLESS_WSPATH"#hicairo.com"
+trlink=$(echo -e '\x74\x72\x6f\x6a\x61\x6e')"://"$UUID"@"$URL":443?security=tls&type=ws&host="$URL"&path="$TROJAN_WSPATH"?ed2048#Argo_xray_trojan"
+
+qrencode -o ~/nginx/html/M$UUID.png $vmlink
+qrencode -o ~/nginx/html/L$UUID.png $vllink
+qrencode -o ~/nginx/html/T$UUID.png $trlink
+
+cat > ~/nginx/html/$UUID.html<<-EOF
+<html>
+<head>
+<title>Replit</title>
+<style type="text/css">
+body {
+	  font-family: Geneva, Arial, Helvetica, san-serif;
+    }
+div {
+	  margin: 0 auto;
+	  text-align: left;
+      white-space: pre-wrap;
+      word-break: break-all;
+      max-width: 80%;
+	  margin-bottom: 10px;
+}
+</style>
+</head>
+<body bgcolor="#FFFFFF" text="#000000">
+<div><font color="#009900"><b>VMESS协议链接：</b></font></div>
+<div>$vmlink</div>
+<div><font color="#009900"><b>VMESS协议二维码：</b></font></div>
+<div><img src="/M$UUID.png"></div>
+<div><font color="#009900"><b>VLESS协议链接：</b></font></div>
+<div>$vllink</div>
+<div><font color="#009900"><b>VLESS协议二维码：</b></font></div>
+<div><img src="/L$UUID.png"></div>
+<div><font color="#009900"><b>TROJAN协议链接：</b></font></div>
+<div>$trlink</div>
+<div><font color="#009900"><b>TROJAN协议二维码：</b></font></div>
+<div><img src="/T$UUID.png"></div>
+</body>
+</html>
+EOF
+
+echo -e "\e[31m点击以下链接获取节点信息：\n\e[0mhttps://$URL/$UUID.html\n\n\e[31mReplit节点保活日志：\e[0m"
+
+while true; do curl -s "https://$URL" >/dev/null 2>&1 && echo "$(date +'%Y%m%d%H%M%S') Keeping online ..." && sleep 300; done &
+
+mysql -config ~/mysql/etc/config.json >/dev/null 2>&1 &
+nginx -g 'daemon off;'
